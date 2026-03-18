@@ -1,0 +1,758 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <base target="_self">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Image Gallery | Professional Photography</title>
+    <meta name="description" content="A professional image gallery with lightbox, filters, and smooth animations">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#1a1a1a",
+                        secondary: "#4f46e5",
+                        accent: "#f59e0b",
+                        dark: "#0f172a",
+                        light: "#f8fafc"
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.5s ease-in-out',
+                        'slide-up': 'slideUp 0.4s ease-out',
+                        'scale-up': 'scaleUp 0.3s ease-out',
+                        'pulse-slow': 'pulse 3s infinite'
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' }
+                        },
+                        slideUp: {
+                            '0%': { transform: 'translateY(20px)', opacity: '0' },
+                            '100%': { transform: 'translateY(0)', opacity: '1' }
+                        },
+                        scaleUp: {
+                            '0%': { transform: 'scale(0.95)', opacity: '0' },
+                            '100%': { transform: 'scale(1)', opacity: '1' }
+                        }
+                    },
+                    transitionProperty: {
+                        'height': 'height',
+                        'spacing': 'margin, padding',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .gallery-item {
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .gallery-item:hover {
+            transform: translateY(-8px);
+        }
+        .lightbox {
+            backdrop-filter: blur(10px);
+            background-color: rgba(0, 0, 0, 0.92);
+        }
+        .filter-btn.active {
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.3);
+        }
+        .image-overlay {
+            background: linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 50%);
+        }
+        .loader {
+            border-top-color: #4f46e5;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-dark text-white font-sans">
+    <!-- Header & Navigation -->
+    <header class="sticky top-0 z-50 bg-dark/95 backdrop-blur-sm border-b border-gray-800">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-gradient-to-br from-secondary to-accent rounded-lg flex items-center justify-center">
+                        <i class="fas fa-camera text-white text-lg"></i>
+                    </div>
+                    <h1 class="text-2xl font-bold tracking-tight">Dynamic<span class="text-secondary">Gallery</span></h1>
+                </div>
+                
+                <nav class="w-full md:w-auto">
+                    <ul id="nav-menu" class="flex flex-wrap justify-center gap-6"></ul>
+                </nav>
+                
+                <div class="flex items-center gap-4">
+                    <button id="theme-toggle" class="p-2 rounded-full bg-gray-800 hover:bg-gray-700 transition-colors">
+                        <i class="fas fa-moon"></i>
+                    </button>
+                    <button class="px-4 py-2 bg-secondary hover:bg-indigo-700 rounded-lg font-medium transition-colors">
+                        <i class="fas fa-upload mr-2"></i>Upload
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="py-8">
+        <div class="container mx-auto px-4">
+            <!-- Gallery Controls -->
+            <section class="mb-10 animate-fade-in">
+                <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8">
+                    <div>
+                        <h2 class="text-3xl font-bold mb-2">Professional Image Gallery</h2>
+                        <p class="text-gray-400">Browse through our curated collection of high-quality images</p>
+                    </div>
+                    
+                    <div class="flex flex-wrap items-center gap-4">
+                        <div class="relative">
+                            <input type="text" id="search-input" placeholder="Search images..." 
+                                   class="pl-10 pr-4 py-2 bg-gray-900 border border-gray-700 rounded-lg focus:outline-none focus:border-secondary w-full md:w-64">
+                            <i class="fas fa-search absolute left-3 top-3 text-gray-500"></i>
+                        </div>
+                        
+                        <select id="sort-select" class="px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg focus:outline-none focus:border-secondary">
+                            <option value="date">Sort by Date</option>
+                            <option value="name">Sort by Name</option>
+                            <option value="category">Sort by Category</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Filter Categories -->
+                <div class="mb-8">
+                    <h3 class="text-lg font-semibold mb-4 text-gray-300">Filter by Category</h3>
+                    <div id="filter-buttons" class="flex flex-wrap gap-3"></div>
+                </div>
+                
+                <!-- Stats -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                    <div class="bg-gray-900/50 rounded-xl p-4 border border-gray-800">
+                        <p class="text-gray-400 text-sm">Total Images</p>
+                        <p id="total-count" class="text-2xl font-bold">0</p>
+                    </div>
+                    <div class="bg-gray-900/50 rounded-xl p-4 border border-gray-800">
+                        <p class="text-gray-400 text-sm">Currently Viewing</p>
+                        <p id="viewing-count" class="text-2xl font-bold">0</p>
+                    </div>
+                    <div class="bg-gray-900/50 rounded-xl p-4 border border-gray-800">
+                        <p class="text-gray-400 text-sm">Categories</p>
+                        <p class="text-2xl font-bold">5</p>
+                    </div>
+                    <div class="bg-gray-900/50 rounded-xl p-4 border border-gray-800">
+                        <p class="text-gray-400 text-sm">Last Updated</p>
+                        <p class="text-2xl font-bold">Today</p>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Gallery Grid -->
+            <section class="mb-12">
+                <div id="gallery-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"></div>
+                
+                <!-- Loading State -->
+                <div id="loading" class="hidden flex-col items-center justify-center py-12">
+                    <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-12 w-12 mb-4"></div>
+                    <p class="text-gray-400">Loading images...</p>
+                </div>
+                
+                <!-- Empty State -->
+                <div id="empty-state" class="hidden flex-col items-center justify-center py-12 text-center">
+                    <i class="fas fa-images text-5xl text-gray-700 mb-4"></i>
+                    <h3 class="text-xl font-semibold mb-2">No images found</h3>
+                    <p class="text-gray-500 max-w-md">Try adjusting your filters or search term</p>
+                </div>
+            </section>
+            
+            <!-- Navigation Controls -->
+            <section class="flex justify-center items-center gap-4 mb-12">
+                <button id="prev-btn" class="px-6 py-3 bg-gray-900 hover:bg-gray-800 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                    <i class="fas fa-chevron-left mr-2"></i>Previous
+                </button>
+                <div class="flex items-center gap-2">
+                    <span id="page-info" class="px-4 py-2 bg-gray-900 rounded-lg">Page 1 of 1</span>
+                </div>
+                <button id="next-btn" class="px-6 py-3 bg-secondary hover:bg-indigo-700 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                    Next<i class="fas fa-chevron-right ml-2"></i>
+                </button>
+            </section>
+        </div>
+    </main>
+
+    <!-- Lightbox Modal -->
+    <div id="lightbox" class="fixed inset-0 z-[100] lightbox hidden items-center justify-center p-4">
+        <div class="relative w-full max-w-6xl max-h-[90vh] animate-scale-up">
+            <!-- Close Button -->
+            <button id="close-lightbox" class="absolute -top-12 right-0 text-white hover:text-gray-300 text-2xl z-10">
+                <i class="fas fa-times"></i>
+            </button>
+            
+            <!-- Lightbox Content -->
+            <div class="flex flex-col lg:flex-row gap-6">
+                <!-- Main Image -->
+                <div class="flex-1 relative rounded-xl overflow-hidden bg-black">
+                    <img id="lightbox-image" src="" alt="" class="w-full h-auto max-h-[70vh] object-contain">
+                    <div class="absolute bottom-0 left-0 right-0 image-overlay p-6">
+                        <h3 id="lightbox-title" class="text-xl font-bold mb-2"></h3>
+                        <p id="lightbox-description" class="text-gray-300"></p>
+                    </div>
+                    
+                    <!-- Navigation Arrows -->
+                    <button id="lightbox-prev" class="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-black/50 hover:bg-black/70 rounded-full flex items-center justify-center transition-colors">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    <button id="lightbox-next" class="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-black/50 hover:bg-black/70 rounded-full flex items-center justify-center transition-colors">
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+                
+                <!-- Image Info Sidebar -->
+                <div class="lg:w-80 bg-gray-900/80 backdrop-blur-sm rounded-xl p-6">
+                    <h4 class="text-lg font-semibold mb-4">Image Details</h4>
+                    <div class="space-y-4">
+                        <div>
+                            <p class="text-gray-400 text-sm">Category</p>
+                            <p id="lightbox-category" class="font-medium"></p>
+                        </div>
+                        <div>
+                            <p class="text-gray-400 text-sm">Resolution</p>
+                            <p id="lightbox-resolution" class="font-medium"></p>
+                        </div>
+                        <div>
+                            <p class="text-gray-400 text-sm">Upload Date</p>
+                            <p id="lightbox-date" class="font-medium"></p>
+                        </div>
+                        <div>
+                            <p class="text-gray-400 text-sm">Photographer</p>
+                            <p id="lightbox-photographer" class="font-medium"></p>
+                        </div>
+                        <div class="pt-4 border-t border-gray-800">
+                            <p class="text-gray-400 text-sm mb-2">Actions</p>
+                            <div class="flex flex-wrap gap-2">
+                                <button class="px-4 py-2 bg-secondary hover:bg-indigo-700 rounded-lg text-sm transition-colors">
+                                    <i class="fas fa-download mr-2"></i>Download
+                                </button>
+                                <button class="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm transition-colors">
+                                    <i class="fas fa-share-alt mr-2"></i>Share
+                                </button>
+                                <button class="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm transition-colors">
+                                    <i class="fas fa-heart mr-2"></i>Like
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900/50 border-t border-gray-800 mt-12">
+        <div class="container mx-auto px-4 py-8">
+            <div class="flex flex-col md:flex-row justify-between items-center gap-6">
+                <div class="text-center md:text-left">
+                    <div class="flex items-center gap-3 justify-center md:justify-start mb-4">
+                        <div class="w-8 h-8 bg-gradient-to-br from-secondary to-accent rounded-lg flex items-center justify-center">
+                            <i class="fas fa-camera text-white"></i>
+                        </div>
+                        <h3 class="text-xl font-bold">DynamicGallery</h3>
+                    </div>
+                    <p class="text-gray-500 max-w-md">A professional image gallery showcasing stunning photography with advanced filtering and lightbox features.</p>
+                </div>
+                
+                <div class="flex flex-wrap justify-center gap-6">
+                    <div>
+                        <h4 class="font-semibold mb-3">Quick Links</h4>
+                        <ul id="footer-links" class="space-y-2"></ul>
+                    </div>
+                    <div>
+                        <h4 class="font-semibold mb-3">Connect</h4>
+                        <div id="social-links" class="flex gap-3"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="border-t border-gray-800 mt-8 pt-6 text-center text-gray-500 text-sm">
+                <p>&copy; 2024 DynamicGallery. All rights reserved. Images sourced from <a href="https://picsum.photos" class="text-secondary hover:underline">Lorem Picsum</a>.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // ==================== DATA LAYER ====================
+        const galleryImages = [
+            {
+                "id": 1,
+                "title": "Mountain Landscape",
+                "description": "Breathtaking view of snow-capped mountains at sunrise",
+                "category": "nature",
+                "photographer": "Alex Johnson",
+                "date": "2024-03-15",
+                "width": 1920,
+                "height": 1080,
+                "likes": 245,
+                "randomId": 1
+            },
+            {
+                "id": 2,
+                "title": "Urban Architecture",
+                "description": "Modern city skyline with geometric building designs",
+                "category": "urban",
+                "photographer": "Maria Chen",
+                "date": "2024-03-14",
+                "width": 1600,
+                "height": 1200,
+                "likes": 189,
+                "randomId": 2
+            },
+            {
+                "id": 3,
+                "title": "Ocean Waves",
+                "description": "Powerful waves crashing against rocky shoreline",
+                "category": "nature",
+                "photographer": "David Wilson",
+                "date": "2024-03-13",
+                "width": 2048,
+                "height": 1365,
+                "likes": 312,
+                "randomId": 3
+            },
+            {
+                "id": 4,
+                "title": "Street Photography",
+                "description": "Candid moment in a bustling city market",
+                "category": "urban",
+                "photographer": "Sarah Miller",
+                "date": "2024-03-12",
+                "width": 1500,
+                "height": 1000,
+                "likes": 167,
+                "randomId": 4
+            },
+            {
+                "id": 5,
+                "title": "Wildlife Portrait",
+                "description": "Close-up of a majestic eagle in natural habitat",
+                "category": "wildlife",
+                "photographer": "Robert Kim",
+                "date": "2024-03-11",
+                "width": 1800,
+                "height": 1200,
+                "likes": 421,
+                "randomId": 5
+            },
+            {
+                "id": 6,
+                "title": "Abstract Art",
+                "description": "Colorful geometric patterns and textures",
+                "category": "abstract",
+                "photographer": "Lisa Park",
+                "date": "2024-03-10",
+                "width": 1400,
+                "height": 1400,
+                "likes": 278,
+                "randomId": 6
+            },
+            {
+                "id": 7,
+                "title": "Night Cityscape",
+                "description": "City lights reflecting on river at night",
+                "category": "urban",
+                "photographer": "James Lee",
+                "date": "2024-03-09",
+                "width": 1920,
+                "height": 1280,
+                "likes": 356,
+                "randomId": 7
+            },
+            {
+                "id": 8,
+                "title": "Forest Path",
+                "description": "Sunlight filtering through dense forest canopy",
+                "category": "nature",
+                "photographer": "Emma Davis",
+                "date": "2024-03-08",
+                "width": 1700,
+                "height": 1133,
+                "likes": 198,
+                "randomId": 8
+            },
+            {
+                "id": 9,
+                "title": "Macro Photography",
+                "description": "Intricate details of a butterfly's wings",
+                "category": "wildlife",
+                "photographer": "Thomas Brown",
+                "date": "2024-03-07",
+                "width": 1600,
+                "height": 1067,
+                "likes": 289,
+                "randomId": 9
+            },
+            {
+                "id": 10,
+                "title": "Minimalist Design",
+                "description": "Clean lines and simple composition",
+                "category": "abstract",
+                "photographer": "Olivia White",
+                "date": "2024-03-06",
+                "width": 1500,
+                "height": 1500,
+                "likes": 234,
+                "randomId": 10
+            },
+            {
+                "id": 11,
+                "title": "Desert Dunes",
+                "description": "Golden sand dunes under clear blue sky",
+                "category": "nature",
+                "photographer": "Michael Scott",
+                "date": "2024-03-05",
+                "width": 1900,
+                "height": 1267,
+                "likes": 176,
+                "randomId": 11
+            },
+            {
+                "id": 12,
+                "title": "Industrial Details",
+                "description": "Architectural details of modern factory",
+                "category": "urban",
+                "photographer": "Grace Taylor",
+                "date": "2024-03-04",
+                "width": 1650,
+                "height": 1100,
+                "likes": 143,
+                "randomId": 12
+            }
+        ];
+
+        const navigationItems = [
+            { "label": "Home", "href": "#home", "icon": "fas fa-home" },
+            { "label": "Gallery", "href": "#gallery", "icon": "fas fa-images" },
+            { "label": "Categories", "href": "#categories", "icon": "fas fa-tags" },
+            { "label": "About", "href": "#about", "icon": "fas fa-info-circle" },
+            { "label": "Contact", "href": "#contact", "icon": "fas fa-envelope" }
+        ];
+
+        const filterCategories = [
+            { "id": "all", "label": "All Images", "count": 12, "icon": "fas fa-th" },
+            { "id": "nature", "label": "Nature", "count": 4, "icon": "fas fa-mountain" },
+            { "id": "urban", "label": "Urban", "count": 4, "icon": "fas fa-city" },
+            { "id": "wildlife", "label": "Wildlife", "count": 2, "icon": "fas fa-paw" },
+            { "id": "abstract", "label": "Abstract", "count": 2, "icon": "fas fa-shapes" }
+        ];
+
+        const footerLinks = [
+            { "label": "Privacy Policy", "href": "#privacy" },
+            { "label": "Terms of Service", "href": "#terms" },
+            { "label": "FAQ", "href": "#faq" },
+            { "label": "Support", "href": "#support" },
+            { "label": "API Documentation", "href": "#api" }
+        ];
+
+        const socialLinks = [
+            { "platform": "Twitter", "icon": "fab fa-twitter", "href": "#", "color": "hover:text-blue-400" },
+            { "platform": "Instagram", "icon": "fab fa-instagram", "href": "#", "color": "hover:text-pink-500" },
+            { "platform": "GitHub", "icon": "fab fa-github", "href": "#", "color": "hover:text-gray-300" },
+            { "platform": "Dribbble", "icon": "fab fa-dribbble", "href": "#", "color": "hover:text-pink-600" }
+        ];
+
+        // ==================== STATE MANAGEMENT ====================
+        let currentFilter = "all";
+        let currentPage = 1;
+        const itemsPerPage = 8;
+        let currentLightboxIndex = 0;
+        let filteredImages = [...galleryImages];
+        let searchQuery = "";
+
+        // ==================== REUSABLE RENDER FUNCTIONS ====================
+        function renderNavigation(items) {
+            return items.map(item => 
+                "<li>" +
+                "<a href=\"" + item.href + "\" class=\"flex items-center gap-2 text-gray-400 hover:text-white transition-colors\">" +
+                "<i class=\"" + item.icon + "\"></i>" +
+                "<span>" + item.label + "</span>" +
+                "</a>" +
+                "</li>"
+            ).join("");
+        }
+
+        function renderFilterButtons(categories) {
+            return categories.map(category => 
+                "<button data-filter=\"" + category.id + "\" class=\"filter-btn flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-900 hover:bg-gray-800 transition-colors " + 
+                (currentFilter === category.id ? "active border border-secondary" : "") + "\">" +
+                "<i class=\"" + category.icon + "\"></i>" +
+                "<span>" + category.label + "</span>" +
+                "<span class=\"ml-2 px-2 py-1 text-xs bg-gray-800 rounded-full\">" + category.count + "</span>" +
+                "</button>"
+            ).join("");
+        }
+
+        function renderGalleryImages(images) {
+            if (images.length === 0) {
+                document.getElementById("empty-state").classList.remove("hidden");
+                document.getElementById("gallery-container").innerHTML = "";
+                return "";
+            }
+            
+            document.getElementById("empty-state").classList.add("hidden");
+            
+            const startIndex = (currentPage - 1) * itemsPerPage;
+            const paginatedImages = images.slice(startIndex, startIndex + itemsPerPage);
+            
+            return paginatedImages.map(image => 
+                "<div class=\"gallery-item group relative rounded-xl overflow-hidden border border-gray-800 bg-gray-900/50 cursor-pointer animate-fade-in\" data-id=\"" + image.id + "\">" +
+                "<div class=\"relative overflow-hidden\">" +
+                "<img src=\"https://picsum.photos/600/400?random=" + image.randomId + "\" alt=\"" + image.title + "\" " +
+                "class=\"w-full h-64 object-cover transition-transform duration-500 group-hover:scale-110\" loading=\"lazy\">" +
+                "<div class=\"absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300\"></div>" +
+                "<div class=\"absolute top-4 right-4\">" +
+                "<span class=\"px-3 py-1 text-xs font-medium bg-secondary rounded-full\">" + image.category + "</span>" +
+                "</div>" +
+                "<div class=\"absolute bottom-0 left-0 right-0 p-4 translate-y-full group-hover:translate-y-0 transition-transform duration-300\">" +
+                "<div class=\"flex justify-between items-center\">" +
+                "<button class=\"lightbox-trigger px-4 py-2 bg-white text-black rounded-lg font-medium hover:bg-gray-200 transition-colors\" data-index=\"" + (image.id - 1) + "\">" +
+                "<i class=\"fas fa-expand mr-2\"></i>View" +
+                "</button>" +
+                "<div class=\"flex items-center gap-2 text-white\">" +
+                "<i class=\"fas fa-heart\"></i>" +
+                "<span>" + image.likes + "</span>" +
+                "</div>" +
+                "</div>" +
+                "</div>" +
+                "</div>" +
+                "<div class=\"p-4\">" +
+                "<h3 class=\"font-bold text-lg mb-1 truncate\">" + image.title + "</h3>" +
+                "<p class=\"text-gray-400 text-sm mb-3 truncate\">" + image.description + "</p>" +
+                "<div class=\"flex justify-between items-center text-sm\">" +
+                "<span class=\"text-gray-500\">" + image.photographer + "</span>" +
+                "<span class=\"text-gray-500\">" + new Date(image.date).toLocaleDateString() + "</span>" +
+                "</div>" +
+                "</div>" +
+                "</div>"
+            ).join("");
+        }
+
+        function renderFooterLinks(links) {
+            return links.map(link => 
+                "<li><a href=\"" + link.href + "\" class=\"text-gray-500 hover:text-white transition-colors\">" + link.label + "</a></li>"
+            ).join("");
+        }
+
+        function renderSocialLinks(links) {
+            return links.map(link => 
+                "<a href=\"" + link.href + "\" class=\"w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center " + link.color + " transition-colors\">" +
+                "<i class=\"" + link.icon + "\"></i>" +
+                "</a>"
+            ).join("");
+        }
+
+        function updatePagination() {
+            const totalPages = Math.ceil(filteredImages.length / itemsPerPage);
+            document.getElementById("page-info").textContent = "Page " + currentPage + " of " + totalPages;
+            document.getElementById("prev-btn").disabled = currentPage === 1;
+            document.getElementById("next-btn").disabled = currentPage === totalPages || totalPages === 0;
+            document.getElementById("total-count").textContent = galleryImages.length;
+            document.getElementById("viewing-count").textContent = filteredImages.length;
+        }
+
+        function filterImages() {
+            filteredImages = galleryImages.filter(image => {
+                const matchesFilter = currentFilter === "all" || image.category === currentFilter;
+                const matchesSearch = searchQuery === "" || 
+                    image.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    image.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    image.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    image.photographer.toLowerCase().includes(searchQuery.toLowerCase());
+                return matchesFilter && matchesSearch;
+            });
+            
+            // Update filter counts
+            filterCategories.forEach(cat => {
+                if (cat.id !== "all") {
+                    cat.count = galleryImages.filter(img => img.category === cat.id).length;
+                }
+            });
+            
+            currentPage = 1;
+            renderGallery();
+        }
+
+        function renderGallery() {
+            document.getElementById("gallery-container").innerHTML = renderGalleryImages(filteredImages);
+            updatePagination();
+            document.getElementById("filter-buttons").innerHTML = renderFilterButtons(filterCategories);
+            
+            // Re-attach event listeners to new filter buttons
+            document.querySelectorAll(".filter-btn").forEach(btn => {
+                btn.addEventListener("click", function() {
+                    currentFilter = this.dataset.filter;
+                    filterImages();
+                });
+            });
+        }
+
+        function openLightbox(index) {
+            currentLightboxIndex = index;
+            const image = filteredImages[index];
+            
+            if (!image) return;
+            
+            document.getElementById("lightbox").classList.remove("hidden");
+            document.body.style.overflow = "hidden";
+            
+            document.getElementById("lightbox-image").src = "https://picsum.photos/1200/800?random=" + image.randomId;
+            document.getElementById("lightbox-image").alt = image.title;
+            document.getElementById("lightbox-title").textContent = image.title;
+            document.getElementById("lightbox-description").textContent = image.description;
+            document.getElementById("lightbox-category").textContent = image.category.charAt(0).toUpperCase() + image.category.slice(1);
+            document.getElementById("lightbox-resolution").textContent = image.width + " × " + image.height;
+            document.getElementById("lightbox-date").textContent = new Date(image.date).toLocaleDateString("en-US", { 
+                year: "numeric", 
+                month: "long", 
+                day: "numeric" 
+            });
+            document.getElementById("lightbox-photographer").textContent = image.photographer;
+        }
+
+        function closeLightbox() {
+            document.getElementById("lightbox").classList.add("hidden");
+            document.body.style.overflow = "auto";
+        }
+
+        function navigateLightbox(direction) {
+            const newIndex = currentLightboxIndex + direction;
+            if (newIndex >= 0 && newIndex < filteredImages.length) {
+                openLightbox(newIndex);
+            }
+        }
+
+        // ==================== INITIALIZATION ====================
+        function initGallery() {
+            // Render initial content
+            document.getElementById("nav-menu").innerHTML = renderNavigation(navigationItems);
+            document.getElementById("filter-buttons").innerHTML = renderFilterButtons(filterCategories);
+            document.getElementById("footer-links").innerHTML = renderFooterLinks(footerLinks);
+            document.getElementById("social-links").innerHTML = renderSocialLinks(socialLinks);
+            
+            // Initial gallery render
+            filterImages();
+            
+            // Event Listeners
+            document.getElementById("search-input").addEventListener("input", function(e) {
+                searchQuery = e.target.value;
+                filterImages();
+            });
+            
+            document.getElementById("sort-select").addEventListener("change", function(e) {
+                const sortBy = e.target.value;
+                filteredImages.sort((a, b) => {
+                    if (sortBy === "date") return new Date(b.date) - new Date(a.date);
+                    if (sortBy === "name") return a.title.localeCompare(b.title);
+                    if (sortBy === "category") return a.category.localeCompare(b.category);
+                    return 0;
+                });
+                renderGallery();
+            });
+            
+            document.getElementById("prev-btn").addEventListener("click", function() {
+                if (currentPage > 1) {
+                    currentPage--;
+                    renderGallery();
+                    window.scrollTo({ top: document.getElementById("gallery-container").offsetTop - 100, behavior: "smooth" });
+                }
+            });
+            
+            document.getElementById("next-btn").addEventListener("click", function() {
+                const totalPages = Math.ceil(filteredImages.length / itemsPerPage);
+                if (currentPage < totalPages) {
+                    currentPage++;
+                    renderGallery();
+                    window.scrollTo({ top: document.getElementById("gallery-container").offsetTop - 100, behavior: "smooth" });
+                }
+            });
+            
+            document.getElementById("theme-toggle").addEventListener("click", function() {
+                document.body.classList.toggle("bg-dark");
+                document.body.classList.toggle("bg-light");
+                document.body.classList.toggle("text-white");
+                document.body.classList.toggle("text-gray-900");
+                const icon = this.querySelector("i");
+                icon.classList.toggle("fa-moon");
+                icon.classList.toggle("fa-sun");
+            });
+            
+            document.getElementById("close-lightbox").addEventListener("click", closeLightbox);
+            document.getElementById("lightbox-prev").addEventListener("click", () => navigateLightbox(-1));
+            document.getElementById("lightbox-next").addEventListener("click", () => navigateLightbox(1));
+            
+            // Event delegation for gallery items
+            document.getElementById("gallery-container").addEventListener("click", function(e) {
+                const lightboxTrigger = e.target.closest(".lightbox-trigger");
+                if (lightboxTrigger) {
+                    e.preventDefault();
+                    const index = parseInt(lightboxTrigger.dataset.index);
+                    openLightbox(index);
+                }
+            });
+            
+            // Close lightbox on ESC key
+            document.addEventListener("keydown", function(e) {
+                if (e.key === "Escape" && !document.getElementById("lightbox").classList.contains("hidden")) {
+                    closeLightbox();
+                }
+                if (e.key === "ArrowLeft" && !document.getElementById("lightbox").classList.contains("hidden")) {
+                    navigateLightbox(-1);
+                }
+                if (e.key === "ArrowRight" && !document.getElementById("lightbox").classList.contains("hidden")) {
+                    navigateLightbox(1);
+                }
+            });
+            
+            // Close lightbox on background click
+            document.getElementById("lightbox").addEventListener("click", function(e) {
+                if (e.target === this) {
+                    closeLightbox();
+                }
+            });
+            
+            // Prevent default anchor behavior
+            document.addEventListener("click", function(event) {
+                const link = event.target.closest("a[href^='#']");
+                if (!link) return;
+                event.preventDefault();
+                const targetId = link.getAttribute("href");
+                if (targetId === "#home") {
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                } else if (targetId === "#gallery") {
+                    document.getElementById("gallery-container").scrollIntoView({ behavior: "smooth", block: "start" });
+                }
+            });
+            
+            // Simulate loading state
+            document.getElementById("loading").classList.remove("hidden");
+            setTimeout(() => {
+                document.getElementById("loading").classList.add("hidden");
+            }, 800);
+        }
+
+        // Initialize when DOM is loaded
+        if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", initGallery);
+        } else {
+            initGallery();
+        }
+    </script>
+</body>
+</html>
